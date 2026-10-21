@@ -7,7 +7,7 @@
 import os
 import sys
 import time
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Iterable, Sequence, Tuple
 
 RESET = "\x1b[0m"
 BOLD = "\x1b[1m"
@@ -63,8 +63,11 @@ class ConsoleUI:
         self.print_line(char * WIDTH, DIM)
 
     def header(self, title: str) -> None:
-        """Заголовок экрана: линия + центрированный текст + линия."""
-        self.clear()
+        """Заголовок экрана: линия + центрированный текст + линия.
+
+        Не очищает экран — печать выше заголовка (баннер, интро) сохраняется.
+        Очистку вызывайте явно через ui.clear() при отрисовке новых экранов.
+        """
         self.divider()
         self.print_line(f"{title:^{WIDTH}}", BOLD)
         self.divider()

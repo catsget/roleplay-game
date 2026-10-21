@@ -39,7 +39,7 @@ class Actions:
         self.game.slots_used = 0
         from king_city.settings import DAYS_TOTAL
         while True:
-            self.show_day_status()
+            self.show_day_status()   # сам очищает экран
             key = self.ui.menu(
                 f"День {self.game.world.day}/{DAYS_TOTAL} — план дня", DAY_MENU)
             if key == "0":
