@@ -16,15 +16,13 @@ from king_city.settings import (DAYS_TOTAL, DEBT_DANGER_LIMIT, DEBT_TERM_DAYS,
                                 WIN_DISTRICTS, WIN_MONEY, WIN_REPUTATION)
 from king_city.systems.economy import Economy
 from king_city.systems.gym import Gym
+from king_city.systems.heist import Heist
 from king_city.systems.labor import Labor
 from king_city.systems.police_system import Police
 from king_city.systems.trading import Trading
 from king_city.systems.actions import Actions
 
-# Места, где деньги округляются до целых рублей
-MONEY_SIGN = "₽"
-
-# Деньги отображаются с этим знаком
+# Знак валюты в интерфейсах
 MONEY_SIGN = "₽"
 
 
@@ -43,6 +41,7 @@ class Game:
         self.labor = Labor(self.ui, self.rng, None)   # actions подключается ниже
         self.gym = Gym(self.ui, self.rng, None)       # actions подключается ниже
         self.police = Police(self.ui, self.rng)
+        self.heist = Heist(self, self.police)
         self.warrant_active = False   # есть ордер (появится с M6)
         self.current_sentence = 0
         self.drug_catalog = build_drugs()

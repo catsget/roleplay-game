@@ -6,6 +6,7 @@
 """
 
 from king_city.core.console_ui import CYAN, GREEN, RED, YELLOW, ConsoleUI
+from king_city.models.player import Player
 from king_city.settings import ENERGY_PER_DAY, SLOTS_PER_DAY
 
 # Шанс, что после действия дня на улице выскочит наезд
@@ -57,6 +58,10 @@ class Actions:
             self.do_job()
         elif key == "3":
             self.do_gym()
+        elif key == "4":
+            self.do_heist()
+        elif key == "5":
+            self.do_scout()
         elif key == "7":
             self.do_connections()
         elif key == "9":
@@ -70,6 +75,26 @@ class Actions:
             return "dead"
         return "alive"
 
+    # --- ограбления (M6) ---
+
+    def do_heist(self) -> None:
+        self.game.heist.heist_screen(self.game.player)
+
+    def do_scout(self) -> None:
+        """Разведка района: обзор города (тратит слот)."""
+        if not self.has_slots():
+            self.ui.print_line("На разведку уже нет слота.", YELLOW)
+            return
+        self.use_slot()
+        player = self.game.player
+        self.ui.header("РАЗВЕДКА")
+        self.ui.print_line(f"  Розыск города: {player.heat}/100", YELLOW)
+        if self.game.warrant_active:
+            self.ui.print_line("  ВАЖНО: на тебя открыт ордер — суд будет жёстче.",
+                               RED)
+        self.ui.print_line("  По городу шепчутся — точные цели ограблений")
+        self.ui.print_line("  и их охрану вскрывают из меню «Ограбление» (разведка).")
+
     # --- связи и взятки (M5) ---
 
     def do_connections(self) -> None:
@@ -80,7 +105,8 @@ class Actions:
         key = self.ui.menu("Что делаем?", [
             ("1", "Занести собранным 2500 ₽ (−25 розыска, риск подставы)"),
             ("2", "Погасить долг кредиторам"),
-            ("3", "Толковать с фракциями (скоро, M7...)"),
+            ("3", "Прикупить железа у знакомого"),
+            ("4", "Толковать с фракциями (ждём M7)"),
             ("0", "Назад"),
         ])
         if key == "1":
@@ -106,10 +132,50 @@ class Actions:
                     paid = player.pay_debt(amount)
                     self.ui.print_line(f"  Погасил {paid} ₽ долга. Осталось "
                                        f"{player.debt} ₽.", GREEN)
-        # 3 — заглушка до M7
-        if self.game.player.is_alive():
-            return "alive"
-        return "dead"
+        elif key == "3":
+            self.black_market(player)
+        # 4 — ждёт M7 (фракции)
+
+    # --- чёрный рынок железа (M6) ---
+
+    def black_market(self, player: Player) -> None:
+        from king_city.data.armors_data import ARMOR_ORDER, ARMORS
+        from king_city.data.weapons_data import WEAPON_ORDER, WEAPONS
+        self.ui.print_line()
+        self.ui.print_line("— ЧЁРНЫЙ РЫНОК У ЗНАКОМОГО —", CYAN)
+        items = []
+        for wid in WEAPON_ORDER:
+            if wid == "fists":
+                continue
+            w = WEAPONS[wid]
+            items.append(("w", wid, w["name"], w["price"],
+                          f"урон ×{w['dmg_mult']}"))
+        for aid in ARMOR_ORDER:
+            a = ARMORS[aid]
+            items.append(("a", aid, a["name"], a["price"],
+                          f"защита {a['protection']}%"))
+        for index, (kind, iid, name, price, effect) in enumerate(items, start=1):
+            mark = "*" if (kind == "w" and player.equipped_weapon.get("id") == iid) \
+                or (kind == "a" and player.equipped_armor.get("id") == iid) else ""
+            self.ui.print_line(f"  [{index}] {name:<20}{price:>6} ₽  ({effect}){mark}")
+        choice = self.ui.ask_number("Что берём? (0 — ничего): ", 0, len(items))
+        if choice == 0:
+            return
+        kind, iid, name, price, effect = items[choice - 1]
+        if not player.spend(price):
+            self.ui.print_line(f"  Не хватает {price - player.money} ₽.", RED)
+            return
+        spec = WEAPONS[iid] if kind == "w" else ARMORS[iid]
+        if kind == "w":
+            player.equipped_weapon = {"id": iid, "name": spec["name"],
+                                      "dmg_mult": spec["dmg_mult"],
+                                      "accuracy": spec["accuracy"]}
+            self.ui.print_line(f"  {name} теперь твоё. Смотри не отрежь себе.",
+                               GREEN)
+        else:
+            player.equipped_armor = {"id": iid, "name": spec["name"],
+                                     "protection": spec["protection"]}
+            self.ui.print_line(f"  {name} надет. Стало чуть спокойнее.", GREEN)
 
     # --- уличные наезды (M4) ---
 
