@@ -88,11 +88,12 @@ class ConsoleUI:
             self.print_line("Введите что-нибудь.", YELLOW, end="\n")
 
     def ask_number(self, prompt: str, low: int, high: int) -> int:
-        """Запрос числа в диапазоне с защитой от мусора."""
+        """Запрос числа в диапазоне с защитой от мусора.
+        Повторный закрытый ввод (EOF) пробрасывается вверх — ловится на уровне цикла."""
         while True:
             try:
                 value = int(input(f"{prompt}").strip())
-            except (ValueError, EOFError):
+            except ValueError:
                 self.print_line("Введите число.", YELLOW)
                 continue
             if low <= value <= high:

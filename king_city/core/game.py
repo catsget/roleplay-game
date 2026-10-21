@@ -17,6 +17,7 @@ from king_city.settings import (DAYS_TOTAL, DEBT_DANGER_LIMIT, DEBT_TERM_DAYS,
 from king_city.systems.economy import Economy
 from king_city.systems.gym import Gym
 from king_city.systems.labor import Labor
+from king_city.systems.police_system import Police
 from king_city.systems.trading import Trading
 from king_city.systems.actions import Actions
 
@@ -41,6 +42,9 @@ class Game:
         self.trading = Trading(self.ui, self.rng, self.economy)
         self.labor = Labor(self.ui, self.rng, None)   # actions подключается ниже
         self.gym = Gym(self.ui, self.rng, None)       # actions подключается ниже
+        self.police = Police(self.ui, self.rng)
+        self.warrant_active = False   # есть ордер (появится с M6)
+        self.current_sentence = 0
         self.drug_catalog = build_drugs()
         self.player: Player | None = None
         self.world: World | None = None
@@ -127,6 +131,7 @@ class Game:
         self.economy.load_dict(state.get("economy", {}))
         gym_state = state.get("gym", {})
         self.gym.soft_counters = gym_state.get("soft_counters", self.gym.soft_counters)
+        self.warrant_active = state.get("warrant_active", False)
         self.slots_used = state.get("slots_used", 0)
         self.ui.print_line(f"Продолжаем забег, {self.player.name}. День "
                            f"{self.world.day}/{DAYS_TOTAL}.", GREEN)
@@ -229,6 +234,7 @@ class Game:
             "reputation": p.reputation,
             "kills": p.kills,
             "arrests": p.arrests,
+            "sentence_served": self.current_sentence if ending in ("dead",) else 0,
         })
         self.ui.print_line("Знаешь, что? Это уже история. Запись — в зал славы.", GREEN)
         self.ui.pause()
@@ -242,6 +248,7 @@ class Game:
             "world": self.world.to_dict(),
             "economy": self.economy.to_dict(),
             "gym": {"soft_counters": dict(self.gym.soft_counters)},
+            "warrant_active": self.warrant_active,
             "slots_used": self.slots_used,
         }
 

@@ -57,11 +57,56 @@ class Actions:
             self.do_job()
         elif key == "3":
             self.do_gym()
+        elif key == "7":
+            self.do_connections()
         elif key == "9":
             self.do_rest()
         else:
             self.ui.print_line("Эта система появится в следующих обновлениях.",
                                YELLOW)
+        # полиция может нагрянуть после(action) — если heat ещё даёт повод
+        self.game.police.daily_stop_check(self.game.player, self.game)
+        if not self.game.player.is_alive():
+            return "dead"
+        return "alive"
+
+    # --- связи и взятки (M5) ---
+
+    def do_connections(self) -> None:
+        player = self.game.player
+        self.ui.header("СВЯЗИ И ВЗЯТКИ")
+        self.ui.print_line(f"  Розыск: {player.heat}/100   Долг: {player.debt} ₽",
+                           YELLOW)
+        key = self.ui.menu("Что делаем?", [
+            ("1", "Занести собранным 2500 ₽ (−25 розыска, риск подставы)"),
+            ("2", "Погасить долг кредиторам"),
+            ("3", "Толковать с фракциями (скоро, M7...)"),
+            ("0", "Назад"),
+        ])
+        if key == "1":
+            if player.spend(2500):
+                if self.game.rng.chance(0.15):
+                    player.add_heat(10)
+                    self.ui.print_line("  Кто-то доложил наверх! Розыск подрос.",
+                                       RED)
+                else:
+                    player.reduce_heat(25)
+                    self.ui.print_line("  Розыск сместился под стол. Стало спокойнее.",
+                                       GREEN)
+            else:
+                self.ui.print_line("  Не хватает 2500 ₽.", RED)
+        elif key == "2":
+            if player.debt <= 0:
+                self.ui.print_line("  В долговых не ходишь — не с кого брать.", YELLOW)
+            else:
+                amount = self.ui.ask_number(
+                    f"  Сколько закидываем? (есть {player.money} ₽): ",
+                    0, min(player.money, player.debt))
+                if amount > 0:
+                    paid = player.pay_debt(amount)
+                    self.ui.print_line(f"  Погасил {paid} ₽ долга. Осталось "
+                                       f"{player.debt} ₽.", GREEN)
+        # 3 — заглушка до M7
         if self.game.player.is_alive():
             return "alive"
         return "dead"
@@ -110,7 +155,7 @@ class Actions:
             hurt = max(1, self.game.rng.roll(15, 35))
             player.hurt(hurt)
             self.ui.print_line(f"Тебя натащили по асфальту: −{hurt} HP.", RED)
-        if not player.is_alive():
+        if not self.game.player.is_alive():
             self.game.show_ending("dead")
             return "final"
         return "alive"
