@@ -5,8 +5,11 @@
 работа, спортзал, отдых) и красиво отказывает на нереализованных.
 """
 
-from king_city.core.console_ui import GREEN, YELLOW, ConsoleUI
+from king_city.core.console_ui import CYAN, GREEN, RED, YELLOW, ConsoleUI
 from king_city.settings import ENERGY_PER_DAY, SLOTS_PER_DAY
+
+# Шанс, что после действия дня на улице выскочит наезд
+STREET_ROB_CHANCE = 0.20
 
 
 class Actions:
@@ -31,7 +34,7 @@ class Actions:
     # --- дневной цикл ---
 
     def day_loop(self) -> str:
-        """План дня до «Спать». Возвращает результат дня был для Game."""
+        """План дня до «Спать». Возвращает результат дня для Game."""
         self.game.slots_used = 0
         from king_city.settings import DAYS_TOTAL
         while True:
@@ -40,17 +43,77 @@ class Actions:
                 f"День {self.game.world.day}/{DAYS_TOTAL} — план дня", DAY_MENU)
             if key == "0":
                 return self.game.finish_day()
-            if key == "1":
-                self.do_trading()
-            elif key == "2":
-                self.do_job()
-            elif key == "3":
-                self.do_gym()
-            elif key == "9":
-                self.do_rest()
+            outcome = self.run_action(key)
+            if outcome == "dead":
+                return "final"          # умер посреди дня — финал
+            if key == "1" and self.game.rng.chance(STREET_ROB_CHANCE):
+                return self.street_encounter()
+
+    def run_action(self, key: str) -> str:
+        """Действие дня; возвращает 'dead', если игрока убили."""
+        if key == "1":
+            self.do_trading()
+        elif key == "2":
+            self.do_job()
+        elif key == "3":
+            self.do_gym()
+        elif key == "9":
+            self.do_rest()
+        else:
+            self.ui.print_line("Эта система появится в следующих обновлениях.",
+                               YELLOW)
+        if self.game.player.is_alive():
+            return "alive"
+        return "dead"
+
+    # --- уличные наезды (M4) ---
+
+    def street_encounter(self) -> str:
+        """Случайный наезд на улицах после действия. 'final' при смерти."""
+        from king_city.data.names_data import STREET_NICKNAMES
+        from king_city.systems.combat import (fighter_from_player, fighter_npc,
+                                              simulate_fight)
+        from king_city.core.console_ui import CYAN, RED
+        player = self.game.player
+        soup_kid = self.game.rng.choice(STREET_NICKNAMES)
+        self.ui.print_line()
+        self.ui.slow(f"Из переулка выходит {soup_kid}: «Что никак, дорого выглядyешь…»",
+                     CYAN)
+        me = fighter_from_player(player, player.equipped_weapon)
+        me.armor_prc = player.equipped_armor.get("protection", 0)
+        enemy = fighter_npc(soup_kid, self.game.world.day, self.game.rng)
+        result = simulate_fight(me, enemy, self.game.rng)
+        # печать журнала: линия заголовка циан, попадания по тебе красным,
+        # твои попадания зелёным, остальное базово
+        for line in result.log:
+            color = ""
+            if line.startswith("—"):
+                color = CYAN
+            elif f"{player.name} вмазал" in line:
+                color = GREEN
+            elif player.name in line and ("вмазал" in line or "оглуш" in line):
+                color = RED
+            self.ui.print_line(line, color)
+        self.ui.pause()
+        # последствия
+        if result.winner == player.name:
+            player.add_reputation(3)
+            if enemy.hp <= 0:
+                player.kills += 1
+                player.add_heat(8)
             else:
-                self.ui.print_line("Эта система появится в следующих обновлениях.",
-                                   YELLOW)
+                player.add_heat(3)
+            player.add_money(result.loot_money)
+            self.ui.print_line(f"Разобрался! Репутация +3, подъём +{result.loot_money} ₽.",
+                               GREEN)
+        else:
+            hurt = max(1, self.game.rng.roll(15, 35))
+            player.hurt(hurt)
+            self.ui.print_line(f"Тебя натащили по асфальту: −{hurt} HP.", RED)
+        if not player.is_alive():
+            self.game.show_ending("dead")
+            return "final"
+        return "alive"
 
     # --- действия ---
 

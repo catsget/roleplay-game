@@ -33,6 +33,10 @@ class Player:
         self.days_worked_legally: int = 0  # для будущего алиби и спада heat
         self.kills: int = 0          # статистика забега
         self.arrests: int = 0        # статистика забега (сколько раз сажали)
+        # --- снаряжение (M4): магазин оружия — в M6+ ---
+        self.equipped_weapon: dict = {"id": "fists", "name": "Кулаки",
+                                      "dmg_mult": 0.8, "accuracy": 0.0}
+        self.equipped_armor: dict = {}   # пусто — без брони
 
     # --- деньги ---
 
@@ -115,6 +119,8 @@ class Player:
             "days_worked_legally": self.days_worked_legally,
             "kills": self.kills,
             "arrests": self.arrests,
+            "equipped_weapon": dict(self.equipped_weapon),
+            "equipped_armor": dict(self.equipped_armor),
         }
 
     @classmethod
@@ -137,4 +143,8 @@ class Player:
         player.days_worked_legally = data["days_worked_legally"]
         player.kills = data["kills"]
         player.arrests = data["arrests"]
+        player.equipped_weapon = data.get("equipped_weapon",
+                                          {"id": "fists", "name": "Кулаки",
+                                           "dmg_mult": 0.8, "accuracy": 0.0})
+        player.equipped_armor = data.get("equipped_armor", {})
         return player
