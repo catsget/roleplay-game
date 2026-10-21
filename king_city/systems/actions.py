@@ -143,6 +143,7 @@ class Actions:
         from king_city.data.weapons_data import WEAPON_ORDER, WEAPONS
         self.ui.print_line()
         self.ui.print_line("— ЧЁРНЫЙ РЫНОК У ЗНАКОМОГО —", CYAN)
+        self.ui.print_line()
         items = []
         for wid in WEAPON_ORDER:
             if wid == "fists":
@@ -158,6 +159,7 @@ class Actions:
             mark = "*" if (kind == "w" and player.equipped_weapon.get("id") == iid) \
                 or (kind == "a" and player.equipped_armor.get("id") == iid) else ""
             self.ui.print_line(f"  [{index}] {name:<20}{price:>6} ₽  ({effect}){mark}")
+        self.ui.print_line()
         choice = self.ui.ask_number("Что берём? (0 — ничего): ", 0, len(items))
         if choice == 0:
             return
@@ -188,14 +190,16 @@ class Actions:
         player = self.game.player
         soup_kid = self.game.rng.choice(STREET_NICKNAMES)
         self.ui.print_line()
-        self.ui.slow(f"Из переулка выходит {soup_kid}: «Что никак, дорого выглядyешь…»",
+        self.ui.slow(f"Из переулка выходит {soup_kid}: «Что-то он ты дорого выглядишь…»",
                      CYAN)
+        self.ui.print_line()
         me = fighter_from_player(player, player.equipped_weapon)
         me.armor_prc = player.equipped_armor.get("protection", 0)
         enemy = fighter_npc(soup_kid, self.game.world.day, self.game.rng)
         result = simulate_fight(me, enemy, self.game.rng)
         # печать журнала: линия заголовка циан, попадания по тебе красным,
         # твои попадания зелёным, остальное базово
+        self.ui.print_line()
         for line in result.log:
             color = ""
             if line.startswith("—"):
@@ -205,6 +209,7 @@ class Actions:
             elif player.name in line and ("вмазал" in line or "оглуш" in line):
                 color = RED
             self.ui.print_line(line, color)
+        self.ui.print_line()
         self.ui.pause()
         # последствия
         if result.winner == player.name:
@@ -269,6 +274,7 @@ class Actions:
                     color=RED if player.hp < 40 else "")
         self.ui.bar("Энергия", player.energy, ENERGY_PER_DAY)
         self.ui.bar("Розыск", player.heat, 100, color=YELLOW if player.heat else "")
+        self.ui.print_line()
         self.ui.print_line(
             f"  Деньги       {player.money:,} ₽   Долг: {player.debt:,} ₽")
         self.ui.print_line(
@@ -277,6 +283,7 @@ class Actions:
         if player.job_id:
             from king_city.systems.labor import JOBS
             self.ui.print_line(f"  Работа       {JOBS[player.job_id]['name']}")
+        self.ui.print_line()
 
 
 # (ключ, подпись) — секунда колонки насыщения позже системами

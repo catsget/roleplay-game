@@ -105,6 +105,7 @@ class Game:
         ui = self.ui
         ui.print_line()
         ui.slow("Тебя затянуло по уши: квартплата, долги кредиторам и большие планы.")
+        ui.print_line()
         ui.print_line(
             f"Стартовые условия: {self.player.money} {MONEY_SIGN} в кармане, "
             f"долг {self.player.debt} {MONEY_SIGN} нужно закрыть "
@@ -115,6 +116,7 @@ class Game:
             f"{WIN_MONEY:,} {MONEY_SIGN} капитала, репутация {WIN_REPUTATION}/1000, "
             f"{WIN_DISTRICTS} района под контролем, за {DAYS_TOTAL} дней."
         )
+        ui.print_line()
         ui.pause()
 
     def continue_game(self) -> None:
@@ -216,7 +218,9 @@ class Game:
 
     def show_ending(self, ending: str) -> None:
         p, w = self.player, self.world
+        self.ui.print_line()
         self.ui.header("ФИНАЛ")
+        self.ui.print_line()
         if ending == "king":
             self.ui.slow("Ты — КОРОЛЬ ГОРОДА. Сталижск теперь твой.", YELLOW, end="\n")
         elif ending == "dead":

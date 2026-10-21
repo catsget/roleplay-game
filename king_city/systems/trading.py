@@ -59,6 +59,7 @@ class Trading:
     def show_market_table(self, district_id: str, player: Player) -> None:
         ui = self.ui
         ui.divider()
+        ui.print_line()
         ui.print_line(f"  {'Товар':<16}{'Закупка':>10}{'Сбыт':>10}   В рюкзаке")
         ui.divider()
         for item_id in DRUG_ORDER:
@@ -68,6 +69,7 @@ class Trading:
             held = player.inventory.count(item_id)
             held_text = f"{held} шт" if held else "—"
             ui.print_line(f"  {name:<16}{buy:>9}₽{sell:>9}₽   {held_text}")
+        ui.print_line()
         ui.divider()
 
     # --- сделки ---

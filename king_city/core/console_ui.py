@@ -114,8 +114,10 @@ class ConsoleUI:
         Возвращает выбранный ключ (str). Неверный ввод повторяет вопрос.
         """
         self.header(title)
+        self.print_line()
         for key, label in options:
             self.print_line(f"  [{key}] {label}")
+        self.print_line()
         self.divider()
         valid = {key for key, _ in options}
         while True:

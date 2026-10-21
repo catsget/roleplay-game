@@ -66,6 +66,7 @@ class Heist:
             self.ui.print_line()
             self.ui.print_line(f"  {t['name']}: {t['description']}", CYAN)
             self.ui.print_line(f"  {guard}   heat: +{t['heat']}   {warrant}")
+            self.ui.print_line()
             key = self.ui.menu(f"Что с {t['name']}?", [
                 ("1", "Разведать (1 слот, показывает точные цифры)"),
                 ("2", "Погнали! (1 слот)"),
@@ -172,8 +173,10 @@ class Heist:
         return simulate_fight(me, guard, self.rng)
 
     def print_journal(self, result: FightResult) -> None:
+        self.ui.print_line()
         for line in result.log:
             self.ui.print_line(line)
+        self.ui.print_line()
 
     # --- пост-обработки ---
 

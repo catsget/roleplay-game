@@ -57,6 +57,7 @@ class Labor:
                 return
 
     def show_job_status(self, player: Player) -> None:
+        self.ui.print_line()
         if player.job_id:
             job = JOBS[player.job_id]
             pay = self.shift_pay_base(player)
@@ -67,9 +68,11 @@ class Labor:
             self.ui.print_line("  Ты не пашешь. Денег станет меньше.", YELLOW)
 
     def browse_jobs(self, player: Player) -> None:
+        self.ui.print_line()
         for label, order in (("— ЛЕГАЛЬНЫЕ —", LEGIT_ORDER),
                              ("— ТЁМНЫЕ —", SHADY_ORDER)):
-            self.ui.print_line(label)
+            self.ui.print_line()
+            self.ui.print_line(f"  {label}")
             for index, job_id in enumerate(order, start=1):
                 job = JOBS[job_id]
                 mark = "" if self.requirement_met(player, job) else "  (не пройдёшь)"
@@ -78,6 +81,7 @@ class Labor:
                     f"  [{index}] {job['name']:<22}{job['pay']:>5} ₽  {sign}, "
                     f"{job['heat_per_shift']} heat/смена{mark}")
                 self.ui.print_line(f"      {job['description']}")
+        self.ui.print_line()
         total = len(LEGIT_ORDER) + len(SHADY_ORDER)
         choice = self.ui.ask_number("Куда устраиваемся? (0 — отмена): ", 0, total)
         if choice == 0:
