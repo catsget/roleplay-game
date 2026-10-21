@@ -7,7 +7,7 @@
 import os
 import sys
 import time
-from typing import Iterable, Sequence, Tuple
+from typing import Iterable, Optional, Sequence, Tuple
 
 RESET = "\x1b[0m"
 BOLD = "\x1b[1m"
@@ -35,8 +35,12 @@ def _enable_windows_vt() -> None:
 class ConsoleUI:
     """Все консольный ввод-вывод игры."""
 
-    def __init__(self, slow_time: float = 0.015) -> None:
+    def __init__(self, slow_time: Optional[float] = None) -> None:
+        """slow_time — секунды на символ в slow(); None = взять из settings.py"""
         _enable_windows_vt()
+        if slow_time is None:
+            from king_city.settings import SLOW_PRINT_TIME
+            slow_time = SLOW_PRINT_TIME
         self.slow_time = slow_time
 
     # --- примитивы печати ---
