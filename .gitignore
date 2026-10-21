@@ -1,0 +1,13 @@
+# Сохранения игры — не в репозиторий
+king_city/saves/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
