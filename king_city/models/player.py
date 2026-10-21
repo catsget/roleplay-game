@@ -5,6 +5,8 @@
 
 from typing import Optional
 
+from king_city.models.inventory import Inventory
+from king_city.models.item import Item
 from king_city.models.stats import Stats
 from king_city.settings import (DEBT_INTEREST, HEAT_DECAY, HEAT_MAX, MAX_HP,
                                 WIN_REPUTATION)
@@ -16,6 +18,7 @@ class Player:
     def __init__(self, name: str, stats: Optional[Stats] = None) -> None:
         self.name: str = name
         self.stats: Stats = stats if stats is not None else Stats()
+        self.inventory = Inventory(strength=self.stats.strength)
         self.money: int = 0          # наличные, ₽
         self.debt: int = 0           # долг кредиторам, ₽
         self.hp: int = MAX_HP
@@ -94,6 +97,7 @@ class Player:
         return {
             "name": self.name,
             "stats": self.stats.to_dict(),
+            "inventory": self.inventory.to_dict(),
             "money": self.money,
             "debt": self.debt,
             "hp": self.hp,
@@ -107,8 +111,12 @@ class Player:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Player":
+    def from_dict(cls, data: dict, catalog: Optional[dict] = None) -> "Player":
         player = cls(data["name"], Stats.from_dict(data["stats"]))
+        if catalog:
+            for item in catalog.values():
+                player.inventory.register(item)
+        player.inventory.load_dict(data.get("inventory", {}))
         player.money = data["money"]
         player.debt = data["debt"]
         player.hp = data["hp"]

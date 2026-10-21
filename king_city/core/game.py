@@ -4,15 +4,18 @@ M1: новая игра → цикл дня (действие + сон) → фи
 Торговля, бой, полиция и прочее добавляются милями M2-M9.
 """
 
-from king_city.core.console_ui import BOLD, CYAN, GREEN, RED, YELLOW, ConsoleUI
+from king_city.core.console_ui import CYAN, GREEN, RED, YELLOW, ConsoleUI
 from king_city.core.rng import Rng
 from king_city.core.save_manager import SaveManager
+from king_city.data.drugs_data import build_drugs
 from king_city.models.player import Player
 from king_city.models.world import World
 from king_city.settings import (DAYS_TOTAL, DEBT_DANGER_LIMIT, DEBT_TERM_DAYS,
                                 ENERGY_PER_DAY, SAVE_VERSION, SLOTS_PER_DAY,
                                 START_DEBT, START_MONEY, WIN_DISTRICTS,
                                 WIN_MONEY, WIN_REPUTATION)
+from king_city.systems.economy import Economy
+from king_city.systems.trading import Trading
 
 # Места, где деньги округляются до целых рублей
 MONEY_SIGN = "₽"
@@ -37,8 +40,14 @@ class Game:
 
     def __init__(self, ui: ConsoleUI) -> None:
         self.ui = ui
-        self.rng = Rng()
+        # seed воспроизводимости тестов: KING_CITY_SEED=42 python main.py
+        import os
+        seed_env = os.environ.get("KING_CITY_SEED")
+        self.rng = Rng(int(seed_env) if seed_env else None)
         self.saves = SaveManager()
+        self.economy = Economy(self.rng)
+        self.trading = Trading(self.ui, self.rng, self.economy)
+        self.drug_catalog = build_drugs()
         self.player: Player | None = None
         self.world: World | None = None
         self.slots_used = 0
@@ -83,8 +92,11 @@ class Game:
         self.player.money = START_MONEY
         self.player.debt = START_DEBT
         self.player.energy = ENERGY_PER_DAY
+        for item in self.drug_catalog.values():
+            self.player.inventory.register(item)
         self.world = World()
         self.world.debt_deadline = DEBT_TERM_DAYS
+        self.economy.regenerate(self.world.day)
         self.slots_used = 0
         self.intro()
         self.run_session()
@@ -113,8 +125,11 @@ class Game:
         if state.get("version") != SAVE_VERSION:
             self.ui.print_line("Сохранение устарело. Начни новую игру.", YELLOW)
             return
-        self.player = Player.from_dict(state["player"])
+        self.player = Player.from_dict(state["player"], catalog=self.drug_catalog)
         self.world = World.from_dict(state["world"])
+        self.economy.load_dict(state.get("economy", {}))
+        if self.world.day != -1 and not self.economy.prices:
+            self.economy.regenerate(self.world.day)  # страховка для старых сейвов
         self.slots_used = state.get("slots_used", 0)
         self.ui.print_line(f"Продолжаем забег, {self.player.name}. День "
                            f"{self.world.day}/{DAYS_TOTAL}.", GREEN)
@@ -149,7 +164,19 @@ class Game:
             if key == "9":
                 self.do_rest()
                 continue
+            if key == "1":
+                self.do_trading()
+                continue
             self.ui.print_line("Эта система появится в следующих обновлениях.", YELLOW)
+
+    def do_trading(self) -> None:
+        """Торговля: 1 слот. Сессия рынка — выход из неё возвращает в план дня."""
+        if self.slots_used >= SLOTS_PER_DAY:
+            self.ui.print_line("День уже расписан — время спать.", YELLOW)
+            return
+        self.slots_used += 1
+        self.trading.open_market(self.player)
+        self.ui.print_line("Рынок закрылся. Слот потрачен.", YELLOW)
 
     def do_rest(self) -> None:
         """Отдых: тратит слот, немного восстанавливает HP и даёт энергию."""
@@ -183,6 +210,8 @@ class Game:
         player.heal(10)
         player.energy = ENERGY_PER_DAY
         world.next_day()
+        # акции рынка на завтра
+        self.economy.regenerate(self.world.day)
         # автосохранение
         self.autosave()
         # проверка финалов
@@ -256,6 +285,7 @@ class Game:
             "version": SAVE_VERSION,
             "player": self.player.to_dict(),
             "world": self.world.to_dict(),
+            "economy": self.economy.to_dict(),
             "slots_used": self.slots_used,
         }
 
