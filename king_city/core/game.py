@@ -11,28 +11,20 @@ from king_city.data.drugs_data import build_drugs
 from king_city.models.player import Player
 from king_city.models.world import World
 from king_city.settings import (DAYS_TOTAL, DEBT_DANGER_LIMIT, DEBT_TERM_DAYS,
-                                ENERGY_PER_DAY, SAVE_VERSION, SLOTS_PER_DAY,
-                                START_DEBT, START_MONEY, WIN_DISTRICTS,
-                                WIN_MONEY, WIN_REPUTATION)
+                                ENERGY_PER_DAY, HEAT_DECAY, HEAT_DECAY_LEGAL,
+                                SAVE_VERSION, START_DEBT, START_MONEY,
+                                WIN_DISTRICTS, WIN_MONEY, WIN_REPUTATION)
 from king_city.systems.economy import Economy
+from king_city.systems.gym import Gym
+from king_city.systems.labor import Labor
 from king_city.systems.trading import Trading
+from king_city.systems.actions import Actions
 
 # Места, где деньги округляются до целых рублей
 MONEY_SIGN = "₽"
 
-# Действие дня: ключ меню → (подпись, тратит ли слот). Пока реализованы не все.
-DAY_ACTIONS = [
-    ("1", "Торговля на рынке района", True),
-    ("2", "Легальная работа", True),
-    ("3", "Спортзал / книги / курсы", True),
-    ("4", "Ограбление", True),
-    ("5", "Разведка района", True),
-    ("6", "Бандитские дела", True),
-    ("7", "Связи и взятки", True),
-    ("8", "Имущество", False),
-    ("9", "Отдых", True),
-    ("0", "Спать — завершить день", False),
-]
+# Деньги отображаются с этим знаком
+MONEY_SIGN = "₽"
 
 
 class Game:
@@ -47,9 +39,14 @@ class Game:
         self.saves = SaveManager()
         self.economy = Economy(self.rng)
         self.trading = Trading(self.ui, self.rng, self.economy)
+        self.labor = Labor(self.ui, self.rng, None)   # actions подключается ниже
+        self.gym = Gym(self.ui, self.rng, None)       # actions подключается ниже
         self.drug_catalog = build_drugs()
         self.player: Player | None = None
         self.world: World | None = None
+        self.actions = Actions(self, self.ui)
+        self.labor.actions = self.actions
+        self.gym.actions = self.actions
         self.slots_used = 0
 
     # ---------- главный цикл меню ----------
@@ -128,8 +125,8 @@ class Game:
         self.player = Player.from_dict(state["player"], catalog=self.drug_catalog)
         self.world = World.from_dict(state["world"])
         self.economy.load_dict(state.get("economy", {}))
-        if self.world.day != -1 and not self.economy.prices:
-            self.economy.regenerate(self.world.day)  # страховка для старых сейвов
+        gym_state = state.get("gym", {})
+        self.gym.soft_counters = gym_state.get("soft_counters", self.gym.soft_counters)
         self.slots_used = state.get("slots_used", 0)
         self.ui.print_line(f"Продолжаем забег, {self.player.name}. День "
                            f"{self.world.day}/{DAYS_TOTAL}.", GREEN)
@@ -153,40 +150,8 @@ class Game:
         self.world = None
 
     def run_day(self) -> str:
-        """Один игровой день: план → действия → сон. Возвращает 'continue'/'exit'/'final'."""
-        self.slots_used = 0
-        while True:
-            self.show_day_status()
-            key = self.ui.menu(f"День {self.world.day}/{DAYS_TOTAL} — план дня",
-                               [(key, label) for key, label, _ in DAY_ACTIONS])
-            if key == "0":
-                return self.finish_day()
-            if key == "9":
-                self.do_rest()
-                continue
-            if key == "1":
-                self.do_trading()
-                continue
-            self.ui.print_line("Эта система появится в следующих обновлениях.", YELLOW)
-
-    def do_trading(self) -> None:
-        """Торговля: 1 слот. Сессия рынка — выход из неё возвращает в план дня."""
-        if self.slots_used >= SLOTS_PER_DAY:
-            self.ui.print_line("День уже расписан — время спать.", YELLOW)
-            return
-        self.slots_used += 1
-        self.trading.open_market(self.player)
-        self.ui.print_line("Рынок закрылся. Слот потрачен.", YELLOW)
-
-    def do_rest(self) -> None:
-        """Отдых: тратит слот, немного восстанавливает HP и даёт энергию."""
-        if self.slots_used >= SLOTS_PER_DAY:
-            self.ui.print_line("День уже расписан — только спать.", YELLOW)
-            return
-        self.slots_used += 1
-        self.player.energy = min(ENERGY_PER_DAY, self.player.energy + 40)
-        self.player.heal(5)
-        self.ui.print_line("Ты плюнул на дела и вздремнул. Полегчало.", GREEN)
+        """Один игровой день: план → действия → сон. Возвращает 'continue'/'final'."""
+        return self.actions.day_loop()
 
     # ---------- финализация дня ----------
 
@@ -194,8 +159,13 @@ class Game:
         player, world = self.player, self.world
         self.ui.divider()
         self.ui.print_line("Ты завалился на кровать...", CYAN)
-        # полиция: спад розыска
-        player.reduce_heat(2)
+        # полиция: спад розыска; на легальной работе быстрее
+        decay = HEAT_DECAY
+        if player.job_id:
+            from king_city.systems.labor import JOBS
+            if JOBS[player.job_id]["legal"]:
+                decay = HEAT_DECAY_LEGAL
+        player.reduce_heat(decay)
         # проценты по долгу
         interest = player.accrue_interest()
         if interest:
@@ -222,21 +192,6 @@ class Game:
         self.ui.print_line(f"Утро дня {world.day}/{DAYS_TOTAL}. Встал, уши заложило.",
                            CYAN)
         return "continue"
-
-    # ---------- экраны ----------
-
-    def show_day_status(self) -> None:
-        p = self.player
-        self.ui.clear()
-        self.ui.divider()
-        self.ui.bar("HP", p.hp, p.max_hp, color=RED if p.hp < 40 else "")
-        self.ui.bar("Энергия", p.energy, ENERGY_PER_DAY)
-        self.ui.bar("Розыск", p.heat, 100, color=YELLOW if p.heat else "")
-        self.ui.print_line(
-            f"  Деньги       {p.money:,} {MONEY_SIGN}   Долг: {p.debt:,} {MONEY_SIGN}")
-        self.ui.print_line(
-            f"  Репутация    {p.reputation}/1000   Слотов свободно: "
-            f"{SLOTS_PER_DAY - self.slots_used}/{SLOTS_PER_DAY}")
 
     # ---------- проверки финалов ----------
 
@@ -286,6 +241,7 @@ class Game:
             "player": self.player.to_dict(),
             "world": self.world.to_dict(),
             "economy": self.economy.to_dict(),
+            "gym": {"soft_counters": dict(self.gym.soft_counters)},
             "slots_used": self.slots_used,
         }
 

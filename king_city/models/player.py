@@ -26,6 +26,10 @@ class Player:
         self.energy: int = 0         # перезаписывается сном (энергия на день)
         self.heat: int = 0           # розыск 0..100
         self.reputation: int = 0     # репутация 0..1000
+        # --- трудоустройство (M3) ---
+        self.job_id: str | None = None   # None = безработный
+        self.job_shifts: int = 0         # отработано смен на текущей работе
+        self.job_level: int = 0          # уровень должности (0..4), растёт от стажа
         self.days_worked_legally: int = 0  # для будущего алиби и спада heat
         self.kills: int = 0          # статистика забега
         self.arrests: int = 0        # статистика забега (сколько раз сажали)
@@ -105,6 +109,9 @@ class Player:
             "energy": self.energy,
             "heat": self.heat,
             "reputation": self.reputation,
+            "job_id": self.job_id,
+            "job_shifts": self.job_shifts,
+            "job_level": self.job_level,
             "days_worked_legally": self.days_worked_legally,
             "kills": self.kills,
             "arrests": self.arrests,
@@ -124,6 +131,9 @@ class Player:
         player.energy = data["energy"]
         player.heat = data["heat"]
         player.reputation = data["reputation"]
+        player.job_id = data.get("job_id")
+        player.job_shifts = data.get("job_shifts", 0)
+        player.job_level = data.get("job_level", 0)
         player.days_worked_legally = data["days_worked_legally"]
         player.kills = data["kills"]
         player.arrests = data["arrests"]
